@@ -6,7 +6,7 @@ export class MangaReader extends Source {
     super(cheerio)
   }
 
-  get version(): string { return '1.0.18' }
+  get version(): string { return '1.0.0' }
   get name(): string { return 'MangaReader' }
   get icon(): string { return 'icon.png' }
   get author(): string { return 'Syn' }
@@ -20,24 +20,23 @@ export class MangaReader extends Source {
     return [createRequestObject({
       metadata: ids[0],
       url: "https://mangareader.net/" + ids[0],
-      method: 'GET',
-
+      method: 'GET'
     })]
   }
   getMangaDetails(data: any, metadata: any): Manga[] {
-    let $ = this.cheerio.load(data);
+    let $ = this.cheerio.load(data)
     let status = $("#main table.d41 tr:nth-child(4) td:nth-child(2)").text().toLowerCase()
 
 
     return [createManga({
       id: metadata,
       titles: [$("#main .d40").text().replace(/\s?(manga)\s?$/gi, '')],
-      image: $('#main .d38 img').attr('src')!.toString(),
+      image: $('#main .d38 img').attr('src')!.replace(/^(\/\/)/gi, 'https://'),
       rating: 0,
       status: status == "ongoing" ? MangaStatus.ONGOING : MangaStatus.COMPLETED,
       artist: $("#main table.d41 tr:nth-child(6) td:nth-child(2)").text(),
       author: $("#main table.d41 tr:nth-child(5) td:nth-child(2)").text(),
-      desc: $("#main .d46 p").text(),
+      desc: $("#main .d46 p").text().replace(/\&quot\;/gi, "'"),
       hentai: false
     })]
   }
@@ -46,12 +45,11 @@ export class MangaReader extends Source {
     return createRequestObject({
       metadata: mangaId,
       url: "https://mangareader.net/" + mangaId,
-      method: 'GET',
-
+      method: 'GET'
     })
   }
   getChapters(data: any, metadata: any): Chapter[] {
-    let $ = this.cheerio.load(data);
+    let $ = this.cheerio.load(data)
     let chapters = $("#main table.d48 tr:not([class])").toArray()
     let chapterList = []
     let nameRegex = /^(.+)(?=\s\d)/gi
@@ -80,14 +78,14 @@ export class MangaReader extends Source {
     })
   }
   search(data: any, metadata: any): MangaTile[] | null {
-    let $ = this.cheerio.load(data);
+    let $ = this.cheerio.load(data)
     let searchResults = $("#ares table tr").toArray()
 
     let mangas = []
     for (let result of searchResults) {
       mangas.push(createMangaTile({
         id: $("a", result).attr('href')!.toString().replace(/\//gi, ''),
-        image: $("div[data-src]", result).attr('data-src')!.toString().replace(/\/\//gi, 'https://'),
+        image: $("div[data-src]", result).attr('data-src')!.toString().replace(/^(\/\/)/g, 'https://').replace(/-r(?=\d)/gi, '-l'),
         title: createIconText({ text: $("a", result).text() })
       }))
     }
@@ -102,21 +100,23 @@ export class MangaReader extends Source {
       cookies: [createCookie({
         name: "drs",
         value: "2",
-        domain: "https://mangareader.net"
-      })] ,
+        domain: "https://www.mangareader.net"
+      })],
       metadata: {
         chapId: chapId,
         mangaId: mangaId
-      } 
+      }
     })
   }
 
   getChapterDetails(data: any, metadata: any): ChapterDetails {
-    let $ = this.cheerio.load(data);
-    let allPages = $("#main .d56 .mI img").toArray()
+    let $ = this.cheerio.load(data, { xmlMode: false })
+
+    let allPages: any = eval("let document = {}; " + $("#main script").html() + "; document['mj'];")
+
     let pages = []
-    for (let page of allPages) {
-      pages.push($(page).attr('src')!.toString().replace(/(?<=\=['"])\/\//g, 'https://'))
+    for (let page of allPages.im) {
+      pages.push(page.u.replace(/^(\/\/)/g, 'https://'))
     }
 
     return createChapterDetails({
@@ -126,7 +126,43 @@ export class MangaReader extends Source {
       pages: pages
     })
   }
+  getHomePageSectionRequest(): HomeSectionRequest[] {
+    let request1 = createRequestObject({
+      url: 'https://www.mangareader.net/popular',
+      method: "GET"
+    })
+    let section1 = createHomeSection({ id: 'popular_manga', title: 'POPULAR MANGA' })
+    return [
+      createHomeSectionRequest({
+        request: request1,
+        sections: [section1]
+      })
+    ]
   }
+  getHomePageSections(data: any, sections: HomeSection[]): HomeSection[] {
+    let $ = this.cheerio.load(data)
+    return sections.map(section => {
+      switch (section.id) {
+        case 'popular_manga':
+          section.items = this.parsePopularMangaTitles($)
+          break;
+      }
 
+      return section
+    })
+  }
+  parsePopularMangaTitles($: CheerioSelector): MangaTile[] {
+    let searchResults = $("#main .d38 table tr").toArray()
 
+    let mangas = []
+    for (let result of searchResults) {
+      mangas.push(createMangaTile({
+        id: $("a", result).attr('href')!.toString().replace(/\//gi, ''),
+        image: $("div[data-src]", result).attr('data-src')!.toString().replace(/^(\/\/)/g, 'https://').replace(/-r(?=\d)/gi, '-l'),
+        title: createIconText({ text: $("a", result).text() })
+      }))
+    }
 
+    return mangas
+  }
+}
