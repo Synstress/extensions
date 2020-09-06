@@ -36,8 +36,7 @@ export class MangaReader extends Source {
       status: status == "ongoing" ? MangaStatus.ONGOING : MangaStatus.COMPLETED,
       artist: $("#main table.d41 tr:nth-child(6) td:nth-child(2)").text(),
       author: $("#main table.d41 tr:nth-child(5) td:nth-child(2)").text(),
-      desc: $("#main .d46 p").text().replace(/\&quot\;/gi, "'"),
-      hentai: false
+      desc: $("#main .d46 p").text().replace(/\&amp\;quot\;/gi, "'"), hentai: false
     })]
   }
 
