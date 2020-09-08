@@ -24,12 +24,12 @@ export class MangaOwl extends Source {
     }
     getMangaDetails(data: any, metadata: any): Manga[] {
         let $ = this.cheerio.load(data)
-        let mangaInfo = $(".single_details")
+        let mangaInfo = $(".single_detail")
         let mangaProps = $('div:nth-child(2) p', mangaInfo).toArray()
         let manga = {
             id: metadata,
             titles: [$('h2', mangaProps).text()],
-            image: $('div:nth-child(1) img', mangaInfo).attr('src')!.replace(/^(\/\/)/gi, 'https://'),
+            image: $('div:nth-child(1) img', mangaInfo).attr('data-src')!.replace(/^(\/\/)/gi, 'https://'),
             rating: 0,
             status: MangaStatus.ONGOING,
             artist: "",
@@ -63,7 +63,7 @@ export class MangaOwl extends Source {
     getChaptersRequest(mangaId: string): Request {
         return createRequestObject({
             metadata: mangaId,
-            url: "https://mangaowl.net/" + mangaId,
+            url: "https://mangaowl.net/single/" + mangaId,
             method: 'GET'
         })
     }
@@ -96,7 +96,7 @@ export class MangaOwl extends Source {
     }
     search(data: any, metadata: any): MangaTile[] | null {
         let $ = this.cheerio.load(data)
-        let searchResults = $('.flexslider comicView').toArray()
+        let searchResults = $('.flexslider .comicView').toArray()
         let mangas = []
         for (let result of searchResults) {
             mangas.push(createMangaTile({
@@ -110,36 +110,30 @@ export class MangaOwl extends Source {
     }
     getChapterDetailsRequest(mangaId: string, chapId: string): Request {
         return createRequestObject({
-          url: "https://mangareader.net/" + mangaId + "/" + chapId,
-          method: 'GET',
-          cookies: [createCookie({
-            name: "drs",
-            value: "2",
-            domain: "https://www.mangareader.net"
-          })],
-          metadata: {
-            chapId: chapId,
-            mangaId: mangaId
-          }
+            url: "http://mangaowl.net/reader/" + mangaId + "/" + chapId,
+            method: 'GET',
+            metadata: {
+                chapId: chapId,
+                mangaId: mangaId
+            }
         })
-      }
-    
-      getChapterDetails(data: any, metadata: any): ChapterDetails {
+    }
+
+    getChapterDetails(data: any, metadata: any): ChapterDetails {
         let $ = this.cheerio.load(data, { xmlMode: false })
-    
-        let allPages: any = eval("let document = {}; " + $("#main script").html() + "; document['mj'];")
-    
+
+        let allPages = $('#reader img[data-src]').toArray()
         let pages = []
-        for (let page of allPages.im) {
-          pages.push(page.u.replace(/^(\/\/)/g, 'https://'))
+        for (let page of allPages) {
+            pages.push($(page).attr('data-src')!)
         }
-    
+
         return createChapterDetails({
-          id: metadata.chapId,
-          longStrip: false,
-          mangaId: metadata.mangaId,
-          pages: pages
+            id: metadata.chapId,
+            longStrip: false,
+            mangaId: metadata.mangaId,
+            pages: pages
         })
-      }
-    
+    }
+
 }
