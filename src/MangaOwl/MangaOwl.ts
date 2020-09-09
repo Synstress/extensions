@@ -24,12 +24,14 @@ export class MangaOwl extends Source {
     }
     getMangaDetails(data: any, metadata: any): Manga[] {
         let $ = this.cheerio.load(data)
+        console.log(data)
         let mangaInfo = $(".single_detail")
         let mangaProps = $('div:nth-child(2) p', mangaInfo).toArray()
+        let mangaIdRegex = /(?:single\/)(\w+)/gi
         let manga = {
             id: metadata,
             titles: [$('h2', mangaProps).text()],
-            image: $('div:nth-child(1) img', mangaInfo).attr('data-src')!.replace(/^(\/\/)/gi, 'https://'),
+            image: $('img', mangaInfo).attr('data-src')!.replace(/^(\/\/)/gi, 'https://'),
             rating: 0,
             status: MangaStatus.ONGOING,
             artist: "",
@@ -50,12 +52,12 @@ export class MangaOwl extends Source {
                 let author = $(prop).contents().filter((_, x) => {
                     return x.type === 'text';
                 }).text();
-                manga.author = author
+                manga.author = author.trim()
             } else if (propertyValue.includes('artist')) {
                 let artist = $(prop).contents().filter((_, x) => {
                     return x.type === 'text'
                 }).text();
-                manga.artist = artist
+                manga.artist = artist.trim()
             }
         }
         return [createManga(manga)]
@@ -63,7 +65,7 @@ export class MangaOwl extends Source {
     getChaptersRequest(mangaId: string): Request {
         return createRequestObject({
             metadata: mangaId,
-            url: "https://mangaowl.net/single/" + mangaId,
+            url: "https://mangaowl.net/single/" + mangaId+ "/chapters-or-something",
             method: 'GET'
         })
     }
@@ -71,9 +73,9 @@ export class MangaOwl extends Source {
         let $ = this.cheerio.load(data)
         let chapters = $('.table-chapter-list .list-group-item.chapter_list').toArray()
         let chapterList = []
-        let chapterStrRegex = /(chapter)\s?(\d+)/gi
-        let chapterNumberRegex = /(\d+$)/gi
-        for (let chapter of chapters) {
+        let chapterStrRegex = /(chapter)\s?(\d+\.?\d+)/gim
+        let chapterNumberRegex = /(\d+?)\.?(\d+$)/gim
+                for (let chapter of chapters) {
             let chapNum = $('label.chapter-title', chapter).text().match(chapterStrRegex)![0].match(chapterNumberRegex)!
             // paste stuff here from now on
             chapterList.push(createChapter({
@@ -81,7 +83,7 @@ export class MangaOwl extends Source {
                 chapNum: Number(chapNum[0]),
                 langCode: LanguageCode.ENGLISH,
                 volume: 0,
-                mangaId: metadata.mangaId,
+                mangaId: metadata,
                 name: "",
                 time: new Date($('.chapter-url small', chapter).text()),
             }))
@@ -97,12 +99,14 @@ export class MangaOwl extends Source {
     search(data: any, metadata: any): MangaTile[] | null {
         let $ = this.cheerio.load(data)
         let searchResults = $('.flexslider .comicView').toArray()
+        let mangaIdRegex = /(?:single\/)(\w+)/gi 
         let mangas = []
         for (let result of searchResults) {
             mangas.push(createMangaTile({
-                id: $(result).attr('data-id')!,
+                id: $('a', result).attr('href')!.match(mangaIdRegex)![0].split('/')[1],
                 image: $('.comic_thumbnail', result).attr('data-background-image')!,
-                title: createIconText({ text: $('.comic_title', result).text() }),
+                title: createIconText({ text: $('.comic_title', result).text().trim() }),
+            
             }))
         }
 
